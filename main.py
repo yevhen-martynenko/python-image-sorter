@@ -8,6 +8,7 @@ from image_sorter.ext.get_files import get_files
 # Define colors
 BACKGROUND_COLOR = 1
 TEXT_COLOR = 8
+TEXT_HIGHLIGHT_COLOR = 100
 
 
 def init_color():
@@ -16,6 +17,8 @@ def init_color():
     curses.use_default_colors()
     for i in range(0, curses.COLORS):
         curses.init_pair(i + 1, i, -1)
+    # user defined colors
+    curses.init_pair(TEXT_HIGHLIGHT_COLOR, 232, 231)
 
 
 def main(stdscr):
@@ -40,11 +43,12 @@ def main(stdscr):
     rectangle(stdscr, 0, col2_x, bottom_y, col2_x + col2_width - 1)
     rectangle(stdscr, 0, col3_x, bottom_y, col3_x + col3_width - 1)
 
-    directory_path = "/home/user/Download"  # TODO: use argparse
+    directory_path = "/home/spes/Downloads/arts/1"  # TODO: use argparse
     files_in_directory = get_files(directory_path)
     num_files = len(files_in_directory)
 
-    scroll_pos = 0
+    scroll_pos = 0  # position of the first visible file
+    selected_item_pos = 0
     max_visible = height - 4
 
     while True:
@@ -57,24 +61,44 @@ def main(stdscr):
         rectangle(stdscr, 0, col3_x, bottom_y, col3_x + col3_width - 1)
 
         # Display content
-        display_file_list(stdscr, files_in_directory, scroll_pos, col1_x)
-        display_image(stdscr, col2_x)
+        display_file_list(stdscr, files_in_directory, scroll_pos, selected_item_pos, col1_width, col1_x)
+        display_image(stdscr, scroll_pos, selected_item_pos, col2_x)
         display_directories(stdscr, col3_x)
 
         stdscr.refresh()
 
         # parse_keybinding(stdscr)
         key = stdscr.getch()
-        if key == curses.KEY_DOWN and scroll_pos + max_visible < num_files:
-            scroll_pos += 1
-        elif key == curses.KEY_UP and scroll_pos > 0:
-            scroll_pos -= 1
+
+        SCROLL_OFFSET = 8
+
+        if key in (curses.KEY_DOWN, ord("j")) and selected_item_pos < num_files - 1:
+            selected_item_pos += 1
+
+            is_scrollable: bool = selected_item_pos >= scroll_pos + max_visible - SCROLL_OFFSET
+            if is_scrollable:
+                scroll_pos += 1
+            if scroll_pos > num_files - max_visible:
+                scroll_pos = max(0, num_files - max_visible)
+
+        elif key in (curses.KEY_UP, ord("k")) and selected_item_pos > 0:
+            selected_item_pos -= 1
+
+            is_scrollable: bool = selected_item_pos < scroll_pos + SCROLL_OFFSET
+            if is_scrollable:
+                scroll_pos -= 1
+            if scroll_pos < 0:
+                scroll_pos = 0
+
         elif key == ord("q"):
             break
 
 
 def display_file_list(
-    stdscr, files_dir: list[str], scroll_pos: int, col1_x: int
+    stdscr,
+    files_dir: list[str],
+    scroll_pos: int, selected_item_pos: int,
+    col1_width: int, col1_x: int
 ) -> None:
     """Display a list of files in the first column with scrolling functionality."""
     max_visible = stdscr.getmaxyx()[0] - 4
@@ -86,14 +110,18 @@ def display_file_list(
         if file_index >= num_files:
             break
 
-        formatted_line: str = (
-            f"{file_index:>{len(str(num_files))}}  {files_dir[file_index]}"
-        )
-        stdscr.addstr(1 + i, col1_x + 2, formatted_line, curses.color_pair(TEXT_COLOR))
+        formatted_line: str = f"{file_index:>{len(str(num_files))}}  {files_dir[file_index]}"
+        formatted_line = formatted_line.ljust(col1_width - 4)
+
+        if file_index == selected_item_pos:
+            stdscr.addstr(1 + i, col1_x + 2, formatted_line, curses.color_pair(TEXT_HIGHLIGHT_COLOR))
+        else:
+            stdscr.addstr(1 + i, col1_x + 2, formatted_line, curses.color_pair(TEXT_COLOR))
 
 
-def display_image(stdscr, col2_x: int) -> None:
-    stdscr.addstr(1, col2_x + 2, "Column 2: image", curses.color_pair(TEXT_COLOR))
+def display_image(stdscr, scroll_pos: int, selected_item_pos: int, col2_x: int) -> None:
+    line_text: str = f"{selected_item_pos}: {scroll_pos}"
+    stdscr.addstr(1, col2_x + 2, line_text, curses.color_pair(TEXT_COLOR))
 
 
 def display_directories(stdscr, col3_x: int) -> None:
