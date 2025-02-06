@@ -1,7 +1,10 @@
 from __future__ import absolute_import
 
+import subprocess
+import shutil
 import curses
 from curses.textpad import rectangle
+from pathlib import Path
 
 from image_sorter.ext.get_files import get_files
 
@@ -62,7 +65,7 @@ def main(stdscr):
 
         # Display content
         display_file_list(stdscr, files_in_directory, scroll_pos, selected_item_pos, col1_width, col1_x)
-        display_image(stdscr, scroll_pos, selected_item_pos, col2_x)
+        display_image(stdscr, directory_path, files_in_directory, scroll_pos, selected_item_pos, col2_x)
         display_directories(stdscr, col3_x)
 
         stdscr.refresh()
@@ -119,9 +122,41 @@ def display_file_list(
             stdscr.addstr(1 + i, col1_x + 2, formatted_line, curses.color_pair(TEXT_COLOR))
 
 
-def display_image(stdscr, scroll_pos: int, selected_item_pos: int, col2_x: int) -> None:
-    line_text: str = f"{selected_item_pos}: {scroll_pos}"
-    stdscr.addstr(1, col2_x + 2, line_text, curses.color_pair(TEXT_COLOR))
+def display_image(
+    stdscr,
+    directory_path: str, files_dir: list[str],
+    scroll_pos: int, selected_item_pos: int,
+    col2_x: int
+) -> None:
+    """Displays an image using Kitty's icat without ruining the terminal borders."""
+    if not files_dir:
+        return
+
+    file_path: Path = Path(directory_path) / files_dir[selected_item_pos]
+    if not file_path.exists():
+        return
+
+    term_width, term_height = shutil.get_terminal_size()
+    img_width: int = max(10, term_width - 2 * col2_x - 5)
+    img_height: int = max(10, term_height - 4)
+    img_pos_left: int = col2_x + 1  # col2_x + border width
+    img_pos_top: int = 1  # border width
+
+    # subprocess.run(["clear"])
+    stdscr.refresh()
+
+    try:
+        subprocess.run([
+            "kitty", "icat",
+            "--align", "left",
+            "--place", f"{img_width}x{img_height}@{img_pos_left}x{img_pos_top}",
+            "--no-trailing-newline", "--silent",
+            "--clear",
+            str(file_path)
+        ], stderr=subprocess.DEVNULL, check=True)
+    except subprocess.CalledProcessError as e:
+        error_message: str = f"Error displaying image: {e}"
+        stdscr.addstr(1, col2_x + 2, error_message, curses.color_pair(TEXT_COLOR))
 
 
 def display_directories(stdscr, col3_x: int) -> None:
