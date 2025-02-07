@@ -8,6 +8,7 @@ from pathlib import Path
 
 from image_sorter.ext.get_files import get_files
 
+
 # Define colors
 BACKGROUND_COLOR = 1
 TEXT_COLOR = 8
@@ -18,8 +19,10 @@ def init_color():
     """Initialize terminal color palette"""
     curses.start_color()
     curses.use_default_colors()
+
     for i in range(0, curses.COLORS):
         curses.init_pair(i + 1, i, -1)
+
     # user defined colors
     curses.init_pair(TEXT_HIGHLIGHT_COLOR, 232, 231)
 
@@ -46,7 +49,14 @@ def main(stdscr):
     rectangle(stdscr, 0, col2_x, bottom_y, col2_x + col2_width - 1)
     rectangle(stdscr, 0, col3_x, bottom_y, col3_x + col3_width - 1)
 
-    directory_path = "/home/spes/Downloads/arts/1"  # TODO: use argparse
+    directory_path = "/home/spes/Downloads/images/"  # TODO: use argparse
+    target_directories = [
+        "/home/user/Downloads/images/1/",
+        "/home/user/Downloads/images/2/",
+        "/home/user/Downloads/images/3/",
+        "/home/user/Downloads/images/4/",
+        "/home/user/Downloads/images/5/",
+    ]
     files_in_directory = get_files(directory_path)
     num_files = len(files_in_directory)
 
@@ -66,7 +76,7 @@ def main(stdscr):
         # Display content
         display_file_list(stdscr, files_in_directory, scroll_pos, selected_item_pos, col1_width, col1_x)
         display_image(stdscr, directory_path, files_in_directory, scroll_pos, selected_item_pos, col2_x)
-        display_directories(stdscr, col3_x)
+        display_directories(stdscr, target_directories, col3_x)
 
         stdscr.refresh()
 
@@ -74,6 +84,7 @@ def main(stdscr):
         key = stdscr.getch()
 
         SCROLL_OFFSET = 8
+        file_path = get_current_file_path(directory_path, files_in_directory, selected_item_pos)
 
         if key in (curses.KEY_DOWN, ord("j")) and selected_item_pos < num_files - 1:
             selected_item_pos += 1
@@ -93,7 +104,7 @@ def main(stdscr):
             if scroll_pos < 0:
                 scroll_pos = 0
 
-        elif key == ord("q"):
+        elif key in (ord("Esc"), ord("q")):
             break
 
 
@@ -129,12 +140,7 @@ def display_image(
     col2_x: int
 ) -> None:
     """Displays an image using Kitty's icat without ruining the terminal borders."""
-    if not files_dir:
-        return
-
-    file_path: Path = Path(directory_path) / files_dir[selected_item_pos]
-    if not file_path.exists():
-        return
+    file_path = get_current_file_path(directory_path, files_dir, selected_item_pos)
 
     term_width, term_height = shutil.get_terminal_size()
     img_width: int = max(10, term_width - 2 * col2_x - 5)
@@ -159,8 +165,51 @@ def display_image(
         stdscr.addstr(1, col2_x + 2, error_message, curses.color_pair(TEXT_COLOR))
 
 
-def display_directories(stdscr, col3_x: int) -> None:
-    stdscr.addstr(1, col3_x + 2, "Column 3: dirs", curses.color_pair(TEXT_COLOR))
+def display_directories(
+    stdscr,
+    target_dirs: list[str],
+    col3_x: int
+) -> None:
+    formatted_dirs: list[str] = format_directories(target_dirs)
+
+    for i, dir in enumerate(formatted_dirs):
+        formatted_line: str = f"{i:>{len(str(i))}}  {dir}"
+        stdscr.addstr(
+            i + 1, col3_x + 2,
+            formatted_line, curses.color_pair(TEXT_COLOR)
+        )
 
 
-curses.wrapper(main)
+def format_directories(dirs: list[str], num_levels: int = 3) -> list[str]:
+    """Format directories"""
+    formatted_dirs: list[str] = []
+
+    for dir in dirs:
+        path_parts: str = dir.split("/")
+
+        if len(path_parts) > num_levels:
+            abbr_path: str = "/".join([i[:1] for i in path_parts[:-num_levels]] + path_parts[-num_levels:])
+        else:
+            abbr_path: str = dir
+
+        formatted_dirs.append(abbr_path)
+
+    return formatted_dirs
+
+
+def get_current_file_path(
+    directory_path: str, files_dir: list[str],
+    selected_item_pos: int
+) -> Path:
+    if not files_dir:
+        return
+
+    file_path: Path = Path(directory_path) / files_dir[selected_item_pos]
+    if not file_path.exists():
+        return
+
+    return file_path
+
+
+if __name__ == "__main__":
+    curses.wrapper(main)
