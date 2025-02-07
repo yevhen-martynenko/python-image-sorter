@@ -2,8 +2,9 @@ from pathlib import Path
 
 
 def get_files(
-        directory_path: str,
-        allowed_extensions: set[str] | None = None
+    directory_path: str,
+    allowed_extensions: set[str] | None = None,
+    max_file_len: int = 16,
 ) -> tuple[list[Path], list[str]]:
     """Retrieve a list of files with specified extensions from a given directory."""
 
@@ -17,10 +18,11 @@ def get_files(
         return [], []
 
     for file in directory.iterdir():
-        files.append(file)
-
         if file.is_file() and file.suffix.lower() in allowed_extensions:
-            formatted_file = f"{file.name[:12]}~{file.suffix}" if len(file.name) > 16 else file.name
+            abbr_filename = f"{file.name[:max_file_len-4]}~{file.suffix}"
+            formatted_file = abbr_filename if len(file.name) > max_file_len else file.name
+
+            files.append(file)
             formatted_files.append(formatted_file)
 
     return files, formatted_files
