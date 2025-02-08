@@ -8,6 +8,7 @@ from pathlib import Path
 
 from image_sorter.ext.get_files import get_files
 from image_sorter.ext.format_dirs import format_directories
+from image_sorter.ext.parser import configure_parser
 
 
 # Define colors
@@ -50,7 +51,7 @@ def main(stdscr):
     rectangle(stdscr, 0, col2_x, bottom_y, col2_x + col2_width - 1)
     rectangle(stdscr, 0, col3_x, bottom_y, col3_x + col3_width - 1)
 
-    directory_path = "/home/spes/Downloads/images/"  # TODO: use argparse
+    directory_path = "/home/spes/Downloads/arts/2"  # TODO: use argparse
     target_directories = [
         "/home/user/Downloads/images/1/",
         "/home/user/Downloads/images/2/",
@@ -88,6 +89,7 @@ def main(stdscr):
         # file_path = get_current_file_path(directory_path, files_in_directory, selected_item_pos)
         file_path: Path = raw_files_in_directory[selected_item_pos]
 
+        # TODO: make functionality of going to the first/last element after reaching top/bottom + 1
         if key in (curses.KEY_DOWN, ord("j")) and selected_item_pos < num_files - 1:
             selected_item_pos += 1
 
@@ -105,6 +107,18 @@ def main(stdscr):
                 scroll_pos -= 1
             if scroll_pos < 0:
                 scroll_pos = 0
+
+        elif key in (curses.DELETE, ord("d")):
+            # TODO: delete file
+            ...
+
+        elif key in (ord("F2"), ord("r")):
+            # TODO: rename file without moving it 
+            ...
+
+        elif key in (ord("F1"), ord("h")):
+            # TODO: open help menu
+            ...
 
         elif key in (ord("Esc"), ord("q")):
             break
@@ -184,4 +198,13 @@ def display_directories(
 
 
 if __name__ == "__main__":
-    curses.wrapper(main)
+    parser = configure_parser()
+    args = parser.parse_args()
+
+    if args.help:
+        parser.print_help()
+    elif args.version:
+        # print_version()
+        pass
+    else:
+        curses.wrapper(main)
