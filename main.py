@@ -10,30 +10,24 @@ from image_sorter.ext.get_files import get_files
 from image_sorter.ext.format_dirs import format_directories
 from image_sorter.ext.parser import configure_parser
 
+from image_sorter.gui.color import get_color, init_colors
+
 
 # Define colors
 BACKGROUND_COLOR = 1
-TEXT_COLOR = 8
+TEXT_COLOR = 0
 TEXT_HIGHLIGHT_COLOR = 100
 
 
-def init_color():
-    """Initialize terminal color palette"""
-    curses.start_color()
-    curses.use_default_colors()
-
-    for i in range(0, curses.COLORS):
-        curses.init_pair(i + 1, i, -1)
-
-    # user defined colors
-    curses.init_pair(TEXT_HIGHLIGHT_COLOR, 232, 231)
-
-
 def main(stdscr):
-    curses.curs_set(0)
-    init_color()
+    curses.curs_set(0)  # hide cursor
+    colors = init_colors()
     # stdscr.bkgd(" ", curses.color_pair(BACKGROUND_COLOR))
     stdscr.erase()
+    stdscr.keypad(True)  # enable keypad keys
+    curses.raw()
+    # stdscr.nodelay(True)  # non-blocking input
+
 
     height, width = stdscr.getmaxyx()
 
@@ -47,9 +41,9 @@ def main(stdscr):
 
     bottom_y = height - 2 if height > 1 else height - 1
 
-    rectangle(stdscr, 0, col1_x, bottom_y, col1_x + col1_width - 1)
-    rectangle(stdscr, 0, col2_x, bottom_y, col2_x + col2_width - 1)
-    rectangle(stdscr, 0, col3_x, bottom_y, col3_x + col3_width - 1)
+    stdscr.erase()
+    for x in [col1_x, col2_x, col3_x]:
+        rectangle(stdscr, 0, x, bottom_y, x + col1_width - 1)
 
     directory_path = "/home/spes/Downloads/arts/2"  # TODO: use argparse
     target_directories = [
@@ -63,12 +57,13 @@ def main(stdscr):
     num_files = len(files_in_directory)
 
     scroll_pos = 0  # position of the first visible file
-    selected_item_pos = 0
+    selected_item_pos = 0 if num_files > 0 else -1 
     max_visible = height - 4
+    SCROLL_OFFSET = 8
+    prev_key = None
 
     while True:
         stdscr.erase()
-        stdscr.refresh()
 
         # Redraw borders
         rectangle(stdscr, 0, col1_x, bottom_y, col1_x + col1_width - 1)
@@ -85,9 +80,18 @@ def main(stdscr):
         # parse_keybinding(stdscr)
         key = stdscr.getch()
 
-        SCROLL_OFFSET = 8
+        if key == -1:
+            continue
+        
         # file_path = get_current_file_path(directory_path, files_in_directory, selected_item_pos)
         file_path: Path = raw_files_in_directory[selected_item_pos]
+        
+        with open("keys.log", "a") as f:
+            f.write(f"Key: {key}\n")
+        
+        if key == 27 and prev_key is not None:
+            key = prev_key  
+        prev_key = key if key != 27 else prev_key
 
         # TODO: make functionality of going to the first/last element after reaching top/bottom + 1
         if key in (curses.KEY_DOWN, ord("j")) and selected_item_pos < num_files - 1:
@@ -108,19 +112,19 @@ def main(stdscr):
             if scroll_pos < 0:
                 scroll_pos = 0
 
-        elif key in (curses.DELETE, ord("d")):
+        elif key in (curses.KEY_DC, ord("d")):
             # TODO: delete file
             ...
 
-        elif key in (ord("F2"), ord("r")):
+        elif key in (curses.KEY_F2, ord("r")):
             # TODO: rename file without moving it 
             ...
 
-        elif key in (ord("F1"), ord("h")):
+        elif key in (curses.KEY_F1, ord("h")):
             # TODO: open help menu
             ...
 
-        elif key in (ord("Esc"), ord("q")):
+        elif key == ord("q"):  # 27 - ESC key
             break
 
 
