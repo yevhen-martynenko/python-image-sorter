@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import subprocess
 import shutil
+import os
 import curses
 from curses.textpad import rectangle
 from pathlib import Path
@@ -11,6 +12,7 @@ from image_sorter.ext.format_dirs import format_directories
 from image_sorter.ext.parser import configure_parser
 
 from image_sorter.gui.color import get_color, init_colors
+from env import directory_path, target_directories 
 
 
 # Define colors
@@ -45,14 +47,6 @@ def main(stdscr):
     for x in [col1_x, col2_x, col3_x]:
         rectangle(stdscr, 0, x, bottom_y, x + col1_width - 1)
 
-    directory_path = "/home/spes/Downloads/arts/2"  # TODO: use argparse
-    target_directories = [
-        "/home/user/Downloads/images/1/",
-        "/home/user/Downloads/images/2/",
-        "/home/user/Downloads/images/3/",
-        "/home/user/Downloads/images/4/",
-        "/home/user/Downloads/images/5/",
-    ]
     raw_files_in_directory, files_in_directory = get_files(directory_path)
     num_files = len(files_in_directory)
 
@@ -127,6 +121,30 @@ def main(stdscr):
         elif key == ord("q"):  # 27 - ESC key
             break
 
+        for i, dir in enumerate(target_directories, start=1):
+            if key == ord(str(i)):
+                move_file(file_path, dir)
+
+
+def move_file(file_path: Path, dir: str) -> None:
+    file_name: str = file_path.name
+    log_message: str = f"Move: {file_name} to {dir}\n"
+
+    try:
+        Path(dir).mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        log_message = f"__ERROR__ while creating dir \"{dir}\": {e}\n"
+
+    try:
+        new_file_path: Path = Path(dir) / file_name
+        file_path.rename(new_file_path)
+        log_message = f"__MOVED__ new file path {new_file_path}: {log_message}"
+    except Exception as e:
+        log_message = f"__ERROR__ \"{log_message}\": {e}\n"
+
+    with open("main.log", "a") as f:
+        f.write(log_message)
+
 
 def display_file_list(
     stdscr,
@@ -193,10 +211,10 @@ def display_directories(
 ) -> None:
     formatted_dirs: list[str] = format_directories(target_dirs)
 
-    for i, dir in enumerate(formatted_dirs):
+    for i, dir in enumerate(formatted_dirs, start=1):
         formatted_line: str = f"{i:>{len(str(i))}}  {dir}"
         stdscr.addstr(
-            i + 1, col3_x + 2,
+            i, col3_x + 2,
             formatted_line, curses.color_pair(TEXT_COLOR)
         )
 
