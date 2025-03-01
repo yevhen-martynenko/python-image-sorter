@@ -6,13 +6,12 @@ from curses.textpad import rectangle
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 
-from image_sorter.ext.get_files import get_files
-from image_sorter.ext.format_dirs import format_directories
-from image_sorter.ext.parser import configure_parser
-from image_sorter.functions_triggered_by_keyblindings.move import move_file
-from image_sorter.gui.color import get_color, init_colors
-
 from env import directory_path, target_directories
+from image_sorter.ext import get_files, format_directories
+
+from image_sorter.ext.parser import configure_parser
+from image_sorter.keybinding_actions.move import move_file
+from image_sorter.gui.color import get_color, init_colors
 
 
 # Define colors
@@ -32,7 +31,6 @@ class ImageSorter:
         self.num_files = len(self.files)
         self.scroll_pos = 0  # position of the first visible file
         self.selected_item_pos = 0 if self.num_files > 0 else -1
-        self.prev_key = None
 
         self.setup_ui()
 
@@ -46,6 +44,7 @@ class ImageSorter:
             self.display_directories()
             self.stdscr.refresh()
 
+            curses.flushinp()
             key = self.stdscr.getch()
             if key == -1:
                 continue
@@ -81,28 +80,39 @@ class ImageSorter:
             rectangle(self.stdscr, 0, x, self.bottom_y, x + width - 1)
 
     def handle_keypress(self, key):
-        file_path: Path = self.raw_files[self.selected_item_pos] if self.selected_item_pos >= 0 else None
-        key_logger(key, self.prev_key)
+        if self.selected_item_pos >= 0:
+            file_path: Path = self.raw_files[self.selected_item_pos]
+        else:
+            file_path = None
+        key_logger(key)
 
-        self.prev_key = key if key != 27 else self.prev_key
+        if key in (curses.KEY_DOWN, ord("j")):
+            if self.selected_item_pos < self.num_files - 1:
+                self.selected_item_pos += 1
+            else:
+                self.selected_item_pos = 0
+                self.scroll_pos = 0
 
-        # TODO: make functionality of going to the first/last element after reaching top/bottom + 1
-        # BUG: while holding j or k unexpected behavior - processing random keys (key_down and key_up work fine)
-        # BUG: maybe because curses process holding keys as some sequence of different keys 
-        if key in (curses.KEY_DOWN, ord("j")) and self.selected_item_pos < self.num_files - 1:
-            self.selected_item_pos += 1
-            
-            #is_scrollable: bool = self.selected_item_pos >= self.scroll_pos + self.max_visible - self.SCROLL_OFFSET
-            is_scrollable: bool = self.selected_item_pos >= self.scroll_pos + self.height - 4 - self.SCROLL_OFFSET
+            is_scrollable: bool = (
+                self.selected_item_pos >=
+                self.scroll_pos + self.max_visible - self.SCROLL_OFFSET
+            )
             if is_scrollable:
                 self.scroll_pos += 1
             if self.scroll_pos > self.num_files - self.max_visible:
                 self.scroll_pos = max(0, self.num_files - self.max_visible)
-            
-        elif key in (curses.KEY_UP, ord("k")) and self.selected_item_pos > 0:
-            self.selected_item_pos -= 1
-            
-            is_scrollable: bool = self.selected_item_pos < self.scroll_pos + self.SCROLL_OFFSET
+
+        elif key in (curses.KEY_UP, ord("k")):
+            if self.selected_item_pos > 0:
+                self.selected_item_pos -= 1
+            else:
+                self.selected_item_pos = self.num_files - 1
+                self.scroll_pos = self.num_files - self.max_visible
+
+            is_scrollable: bool = (
+                self.selected_item_pos <
+                self.scroll_pos + self.SCROLL_OFFSET
+            )
             if is_scrollable:
                 self.scroll_pos -= 1
             if self.scroll_pos < 0:
@@ -119,7 +129,7 @@ class ImageSorter:
 
         #elif key == Enter:
             ...  # TODO: open image in new window in default image viewer
-
+        
         elif key == ord("q"):  # TODO: add ESC (27) key
             return True  # TODO: close the program
 
@@ -131,7 +141,7 @@ class ImageSorter:
     def process_keypress(self, key, file_path: Path) -> None:
         for i, target_dir in enumerate(self.target_directories, start=1):
             if key == ord(str(i)):
-                self.move_file(file_path, target_dir)
+                move_file(file_path, target_dir)
 
                 if 0 <= self.selected_item_pos < len(self.files):  # Prevent IndexError
                     del self.files[self.selected_item_pos]
@@ -194,14 +204,14 @@ class ImageSorter:
             )
 
 
-def key_logger(key: int, prev_key: int) -> None:
+def key_logger(key: int) -> None:
     with open("logs/keys.log", "a") as f:
         if key == curses.KEY_DOWN:
-            f.write(f"KEY_DOWN is pressed: {key}. Previous key: {prev_key}\n")
+            f.write(f"KEY_DOWN is pressed: {key}\n")
         elif key == curses.KEY_UP:
-            f.write(f"KEY_UP is pressed: {key}. Previous key: {prev_key}\n")
+            f.write(f"KEY_UP is pressed: {key}\n")
         else:
-            f.write(f"Key: {key}. Previous key: {prev_key}\n")
+            f.write(f"Key: {key}\n")
 
 
 def logging_change_name(message: str, *args) -> None:
