@@ -20,4 +20,3 @@ def move_file(file_path: Path, dir: str) -> None:
 
     with open("logs/main.log", "a") as f:
         f.write(log_message)
-

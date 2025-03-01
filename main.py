@@ -1,16 +1,21 @@
 import curses
 import subprocess
 import shutil
-import logging
 from curses.textpad import rectangle
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 
 from env import directory_path, target_directories
 from image_sorter.ext import get_files, format_directories
+from image_sorter.keybinding_actions import (
+    move_file,
+    copy_file,
+    delete_file,
+    rename_file,
+    open_with_system_app,
+)
 
 from image_sorter.ext.parser import configure_parser
-from image_sorter.keybinding_actions.move import move_file
 from image_sorter.gui.color import get_color, init_colors
 
 
@@ -27,8 +32,7 @@ class ImageSorter:
         self.stdscr = stdscr
         self.directory_path = directory_path
         self.target_directories = target_directories
-        self.raw_files, self.files = get_files(self.directory_path)
-        self.num_files = len(self.files)
+        self.load_files()
         self.scroll_pos = 0  # position of the first visible file
         self.selected_item_pos = 0 if self.num_files > 0 else -1
 
@@ -39,7 +43,7 @@ class ImageSorter:
             self.stdscr.erase()
             self.draw_borders()
 
-            self.display_file_list()
+            self.display_file_list()  # TODO: parse situation with no images avaliable
             self.display_image()
             self.display_directories()
             self.stdscr.refresh()
@@ -78,6 +82,15 @@ class ImageSorter:
     def draw_borders(self):
         for col_name, (x, width) in self.cols.items():
             rectangle(self.stdscr, 0, x, self.bottom_y, x + width - 1)
+
+    def load_files(self) -> None:
+        """Loads files from the main directory"""
+        self.raw_files, self.files = get_files(self.directory_path)
+        self.num_files = len(self.files)
+
+        if not self.files:
+            main_logger(f"__ERROR__: Failed to load files from {self.directory_path}")
+            self.selected_item_pos = -1
 
     def handle_keypress(self, key):
         if self.selected_item_pos >= 0:
@@ -119,34 +132,38 @@ class ImageSorter:
                 self.scroll_pos = 0
 
         elif key in (curses.KEY_DC, ord("d")):
-            ...  # TODO: delete file
+            delete_file(file_path)  # TODO: delete file
 
         elif key in (curses.KEY_F2, ord("r")):
-            ...  # TODO: rename file
+            # rename_file(file_path, new_name)  # TODO: rename file, make a prompt for new_name
+            ...
 
         elif key in (curses.KEY_F1, ord("h")):
             ...  # TODO: open help menu
 
-        #elif key == Enter:
-            ...  # TODO: open image in new window in default image viewer
-        
-        elif key == ord("q"):  # TODO: add ESC (27) key
-            return True  # TODO: close the program
+        elif key in (curses.KEY_ENTER, 10, 13):
+            open_with_system_app(file_path)  # TODO: open image in new window in default image viewer
+
+        elif key in (ord("q"), 27):  # 27 - ESC
+            return True
 
         elif file_path:
             self.process_keypress(key, file_path)
 
         return False
 
-    def process_keypress(self, key, file_path: Path) -> None:
-        for i, target_dir in enumerate(self.target_directories, start=1):
-            if key == ord(str(i)):
-                move_file(file_path, target_dir)
+    def process_keypress(self, key: int, file_path: Path, is_copy: bool = False) -> None:  # TODO: get is_copy with argparse
+        """Handles keypress events for moving or copying files to target directories"""
+        target_index: int = key - ord('0')
 
-                if 0 <= self.selected_item_pos < len(self.files):  # Prevent IndexError
-                    del self.files[self.selected_item_pos]
-                else:  # TODO: remove logging
-                    logging.warning(f"Invalid index: {self.selected_item_pos} (out of range)")
+        if 1 <= target_index <= len(self.target_directories):
+            target_dir = self.target_directories[target_index - 1]
+
+            if is_copy:
+                copy_file(file_path, target_dir)
+            else:
+                move_file(file_path, target_dir)
+                self.load_files()
 
     def display_file_list(self) -> None:
         """Display a list of files in the first column with scrolling functionality."""
@@ -163,7 +180,7 @@ class ImageSorter:
             self.stdscr.addstr(1 + i, self.cols['col1'][0] + 2, formatted_line, attr)
 
     def display_image(self) -> None:
-        """Displays an image using Kitty's icat without ruining the terminal borders."""
+        """Displays an image using Kitty's icat with a dynamically sized picture"""
         if self.selected_item_pos < 0:
             return
 
@@ -202,6 +219,11 @@ class ImageSorter:
                 formatted_line,
                 curses.color_pair(TEXT_COLOR)  # TODO: change to get_color()
             )
+
+
+def main_logger(message: str) -> None:
+    with open("logs/main.log", "a") as f:
+        f.write(message)
 
 
 def key_logger(key: int) -> None:
