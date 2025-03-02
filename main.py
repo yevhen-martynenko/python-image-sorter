@@ -5,8 +5,12 @@ from curses.textpad import rectangle
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 
-from env import directory_path, target_directories
-from image_sorter.ext import get_files, format_directories
+from image_sorter.ext.parser import configure_parser
+from image_sorter.ext.loggers import Logger
+from image_sorter.ext import (
+    get_files,
+    format_directories,
+)
 from image_sorter.keybinding_actions import (
     move_file,
     copy_file,
@@ -14,10 +18,10 @@ from image_sorter.keybinding_actions import (
     rename_file,
     open_with_system_app,
 )
-
-from image_sorter.ext.parser import configure_parser
-from image_sorter.ext.loggers import Logger
-from image_sorter.gui.color import get_color, init_colors
+from image_sorter.gui.color import (
+    get_color,
+    init_colors,
+)
 
 
 # Define colors
@@ -29,11 +33,12 @@ TEXT_HIGHLIGHT_COLOR = 100
 class ImageSorter:
     SCROLL_OFFSET = 8
 
-    def __init__(self, stdscr, directory_path, target_directories):
+    def __init__(self, stdscr, args):
         self.stdscr = stdscr
         self.logger = Logger()
-        self.directory_path = directory_path
-        self.target_directories = target_directories
+        self.args = args
+        self.directory_path: str = args.input_dir
+        self.target_directories: list[str] = args.output_dirs
         self.load_files()
         self.scroll_pos = 0  # position of the first visible file
         self.selected_item_pos = 0 if self.num_files > 0 else -1
@@ -87,7 +92,21 @@ class ImageSorter:
 
     def load_files(self) -> None:
         """Loads files from the main directory"""
-        self.raw_files, self.files = get_files(self.directory_path)
+        if self.args.tree:
+            directories: list[Path] = [d for d in Path(self.directory_path).iterdir() if d.is_dir()]
+            directories.append(Path(self.directory_path))
+
+            raw_files, files = [], []
+
+            for dir in directories:
+                raw_f, f = get_files(dir)
+                raw_files.extend(raw_f)
+                files.extend(f)
+
+            self.raw_files, self.files = raw_files, files
+        else:
+            self.raw_files, self.files = get_files(self.directory_path)
+
         self.num_files = len(self.files)
 
         if not self.files:
@@ -138,10 +157,16 @@ class ImageSorter:
                 self.scroll_pos = 0
 
         elif key in (curses.KEY_DC, ord("d")):
-            safe_delete = True  # TODO: get with argparse
-            delete_file(file_path, safe_delete)  # TODO: delete file
+            log_message, log_level = delete_file(
+                file_path,
+                self.args.safe_delete,
+                self.args.confirm_delete
+            )
+            self.logger.log_message(log_message, log_level)
+            self.load_files()
 
         elif key in (curses.KEY_F2, ord("r")):
+            auto_rename = self.args.auto_rename
             # rename_file(file_path, new_name)  # TODO: rename file, make a prompt for new_name
             ...
 
@@ -149,7 +174,7 @@ class ImageSorter:
             ...  # TODO: open help menu
 
         elif key in (curses.KEY_ENTER, 10, 13):
-            open_with_system_app(file_path)  # TODO: open image in new window in default image viewer
+            open_with_system_app(file_path)
 
         elif key in (ord("q"), 27):  # 27 - ESC
             return True
@@ -170,7 +195,7 @@ class ImageSorter:
                 copy_file(file_path, target_dir)
             else:
                 log_message, log_level = move_file(file_path, target_dir)
-                self.logger.main_log(log_message, log_level)
+                self.logger.log_message(log_message, log_level)
                 self.load_files()
 
     def display_file_list(self) -> None:
@@ -229,16 +254,22 @@ class ImageSorter:
             )
 
 
-def main(stdscr):
-    app: ImageSorter = ImageSorter(stdscr, directory_path, target_directories)
+def main(stdscr, args):
+    app: ImageSorter = ImageSorter(stdscr, args)
+    app.run()
+
+
+if __name__ == "__main__":
     parser: ArgumentParser = configure_parser()
     args: Namespace = parser.parse_args()
+
+    print(args)
+# Namespace(input_dir='images/',
+# output_dirs=['images/forest/', 'images/sea/', 'images/mountains/'],
+# tree=None, safe_delete=True, confirm_delete=False, auto_rename=None,
+# help=False, version=False)
 
     if args.help:
         parser.print_help()
     else:
-        app.run()
-
-
-if __name__ == "__main__":
-    curses.wrapper(main)
+        curses.wrapper(main, args)

@@ -10,43 +10,45 @@ def configure_parser() -> argparse.ArgumentParser:
     )
 
     cmd_group = parser.add_argument_group("Commands")
-    cmd = cmd_group.add_mutually_exclusive_group()
+    cmd = cmd_group
     cmd.add_argument(
-        "-in",
+        "--input-dir",
         type=str,
+        required=True,
         metavar="DIR",
         help="directory to take pictures from"
     )
     cmd.add_argument(
-        "-out",
-        type=str,
+        "--output-dirs",
+        required=True,
+        nargs="*",
         metavar="DIR",
         help="directory to move pictures to"
     )
     cmd.add_argument(
         "--tree",
-        type=str,
-        nargs="?",
-        metavar="00-11",
-        help="first number refers to '-in', second to '-out'"
+        action="store_true",
+        default=False,
+        help="first level tree"  # TODO: add help
     )
     cmd.add_argument(
         "--safe-delete",
         action="store_true",
+        default=True,
         help="move files to '~/.trash/image_sorter/' instead of deleting them permanently"
     )
     cmd.add_argument(
         "--confirm-delete",
         action="store_true",
-        default=True,
+        default=False,
         help="require confirmation before deletion"
     )
     cmd.add_argument(
-        "--autorename",
+        "--auto-rename",
         type=int,
         nargs="?",
         metavar="BASE",
-        default="10",
+        # default="-1",
         help="automatically rename files using the specified numeral base"
     )
 
