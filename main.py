@@ -16,6 +16,7 @@ from image_sorter.keybinding_actions import (
 )
 
 from image_sorter.ext.parser import configure_parser
+from image_sorter.ext.loggers import Logger
 from image_sorter.gui.color import get_color, init_colors
 
 
@@ -30,6 +31,7 @@ class ImageSorter:
 
     def __init__(self, stdscr, directory_path, target_directories):
         self.stdscr = stdscr
+        self.logger = Logger()
         self.directory_path = directory_path
         self.target_directories = target_directories
         self.load_files()
@@ -89,7 +91,10 @@ class ImageSorter:
         self.num_files = len(self.files)
 
         if not self.files:
-            main_logger(f"__ERROR__: Failed to load files from {self.directory_path}")
+            self.logger.log_message(
+                f"Failed to load files from {self.directory_path}",
+                level="error"
+            )
             self.selected_item_pos = -1
 
     def handle_keypress(self, key):
@@ -97,7 +102,8 @@ class ImageSorter:
             file_path: Path = self.raw_files[self.selected_item_pos]
         else:
             file_path = None
-        key_logger(key)
+
+        self.logger.log_key_press(key)
 
         if key in (curses.KEY_DOWN, ord("j")):
             if self.selected_item_pos < self.num_files - 1:
@@ -132,7 +138,8 @@ class ImageSorter:
                 self.scroll_pos = 0
 
         elif key in (curses.KEY_DC, ord("d")):
-            delete_file(file_path)  # TODO: delete file
+            safe_delete = True  # TODO: get with argparse
+            delete_file(file_path, safe_delete)  # TODO: delete file
 
         elif key in (curses.KEY_F2, ord("r")):
             # rename_file(file_path, new_name)  # TODO: rename file, make a prompt for new_name
@@ -162,7 +169,8 @@ class ImageSorter:
             if is_copy:
                 copy_file(file_path, target_dir)
             else:
-                move_file(file_path, target_dir)
+                log_message, log_level = move_file(file_path, target_dir)
+                self.logger.main_log(log_message, log_level)
                 self.load_files()
 
     def display_file_list(self) -> None:
@@ -219,26 +227,6 @@ class ImageSorter:
                 formatted_line,
                 curses.color_pair(TEXT_COLOR)  # TODO: change to get_color()
             )
-
-
-def main_logger(message: str) -> None:
-    with open("logs/main.log", "a") as f:
-        f.write(message)
-
-
-def key_logger(key: int) -> None:
-    with open("logs/keys.log", "a") as f:
-        if key == curses.KEY_DOWN:
-            f.write(f"KEY_DOWN is pressed: {key}\n")
-        elif key == curses.KEY_UP:
-            f.write(f"KEY_UP is pressed: {key}\n")
-        else:
-            f.write(f"Key: {key}\n")
-
-
-def logging_change_name(message: str, *args) -> None:
-    with open("logs/custom.log", "a") as f:
-        f.write(f"{message}: {', '.join(map(str, args))}\n")
 
 
 def main(stdscr):
