@@ -1,12 +1,13 @@
 import curses
 import subprocess
 import shutil
-from curses.textpad import rectangle
+from curses.textpad import rectangle, Textbox
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 
 from image_sorter.ext.parser import configure_parser
 from image_sorter.ext.loggers import Logger
+from image_sorter.gui.ui import UI
 from image_sorter.ext import (
     get_files,
     format_directories,
@@ -19,16 +20,6 @@ from image_sorter.keybinding_actions import (
     rename_file,
     open_with_system_app,
 )
-from image_sorter.gui.color import (
-    get_color,
-    init_colors,
-)
-
-
-# Define colors
-BACKGROUND_COLOR = 1
-TEXT_COLOR = 0
-TEXT_HIGHLIGHT_COLOR = 100
 
 
 class ImageSorter:
@@ -37,6 +28,7 @@ class ImageSorter:
     def __init__(self, stdscr, args):
         self.stdscr = stdscr
         self.logger = Logger()
+        self.ui = UI()  # TODO: get theme name with argparse
         self.args = args
         self.directory_path: str = args.input_dir
         self.target_directories: list[str] = args.output_dirs
@@ -64,12 +56,11 @@ class ImageSorter:
                 break
 
     def setup_ui(self):
-        self.colors = init_colors()
+        self.colors = self.ui.load_colors()
+        self.logger.log_custom_event("self.colors: ", self.colors)
         self.stdscr.keypad(True)  # enable keypad keys
-        curses.curs_set(0)  # hide cursor
+        curses.curs_set(0)        # hide cursor
         curses.raw()
-        # self.stdscr.nodelay(True)  # non-blocking input
-        # self.stdscr.bkgd(" ", curses.color_pair(BACKGROUND_COLOR))
 
         self.height, self.width = self.stdscr.getmaxyx()
         self.max_visible = self.height - 4
@@ -87,7 +78,7 @@ class ImageSorter:
         }
         self.bottom_y = self.height - 2 if self.height > 1 else self.height - 1
 
-    def draw_borders(self):
+    def draw_borders(self):  # TODO: add color to borders
         for col_name, (x, width) in self.cols.items():
             rectangle(self.stdscr, 0, x, self.bottom_y, x + width - 1)
 
@@ -98,7 +89,6 @@ class ImageSorter:
             directories.append(Path(self.directory_path))
 
             raw_files, files = [], []
-
             for dir in directories:
                 raw_f, f = get_files(dir)
                 raw_files.extend(raw_f)
@@ -167,8 +157,7 @@ class ImageSorter:
             self.load_files()
 
         elif key in (curses.KEY_F2, ord("r")):
-            auto_rename = self.args.auto_rename
-            # rename_file(file_path, new_name)  # TODO: rename file, make a prompt for new_name
+            # rename_file(file_path, new_name)  # TODO: rename file, make a prompt for new_name. use curses Textbox
             ...
 
         elif key in (curses.KEY_F1, ord("h")):
@@ -200,17 +189,20 @@ class ImageSorter:
                 self.load_files()
 
     def display_file_list(self) -> None:
-        """Display a list of files in the first column with scrolling functionality."""
+        """Display a list of files in the first column with scrolling functionality"""
         for i in range(min(self.max_visible, len(self.files) - self.scroll_pos)):
             file_index: int = self.scroll_pos + i
             if file_index >= self.num_files:
                 break
 
-            formatted_line: str = f"{file_index:>{len(str(self.num_files))}}  {self.files[file_index]}"
+            max_line_length: int = max(len(f) for f in self.files)
+            formatted_line: str = f"{file_index:>{len(str(self.num_files))}}  {self.files[file_index]:<{max_line_length}}"
             formatted_line = formatted_line.ljust(self.cols["col1"][0] - 4)
 
-            # TODO: use get_color instead curses.color_pair
-            attr = curses.color_pair(TEXT_HIGHLIGHT_COLOR) if file_index == self.selected_item_pos else curses.color_pair(TEXT_COLOR)
+            if file_index == self.selected_item_pos:
+                attr = self.ui.get_color("text_highlight", self.ui.elements.get("cursor", "normal"))
+            else:
+                attr = self.ui.get_color("text")
             self.stdscr.addstr(1 + i, self.cols['col1'][0] + 2, formatted_line, attr)
 
     def display_image(self) -> None:
@@ -240,24 +232,29 @@ class ImageSorter:
                 str(file_path)
             ], stderr=subprocess.DEVNULL, check=True)
         except subprocess.CalledProcessError as e:
-            error_message: str = f"Error displaying image: {e}"
-            self.stdscr.addstr(1, col2_x + 2, error_message, curses.color_pair(TEXT_COLOR))
+            error_message: str = "Error displaying image"  # : {e}"
+            self.stdscr.addstr(1, col2_x + 2, error_message, self.ui.get_color("error"))
 
     def display_directories(self) -> None:
         """Displays formatted target directories with indexed previews"""
         MAX_DISPLAY = 30
         PREFIX_MAP = {10: "c+", 20: "a+"}
-        formatted_dirs: list[str] = format_directories(self.target_directories, num_levels=2)
+        formatted_dirs: list[str] = format_directories(
+            self.target_directories,
+            num_levels=2
+        )
+
+        max_index_length: int = len(str(min(MAX_DISPLAY, len(formatted_dirs)))) + (1 if len(formatted_dirs) >= 10 else 0)
 
         for i, dir in enumerate(formatted_dirs[:MAX_DISPLAY], start=1):
-            prefix = next((v for k, v in PREFIX_MAP.items() if i >= k), "")
+            prefix: str = next((v for k, v in PREFIX_MAP.items() if i >= k), "")
             preview: str = f"{prefix}{i % 10}" if prefix else str(i)
 
-            formatted_line: str = f"{preview:<3}  {dir}"
+            formatted_line: str = f"{preview:<{max_index_length}}  {dir}"
             self.stdscr.addstr(
                 i, self.cols["col3"][0] + 2,
                 formatted_line,
-                curses.color_pair(TEXT_COLOR)  # TODO: change to get_color()
+                self.ui.get_color("text")
             )
 
 
@@ -269,12 +266,6 @@ def main(stdscr, args):
 if __name__ == "__main__":
     parser: ArgumentParser = configure_parser()
     args: Namespace = parser.parse_args()
-
-    print(args)
-# Namespace(input_dir='images/',
-# output_dirs=['images/forest/', 'images/sea/', 'images/mountains/'],
-# tree=None, safe_delete=True, confirm_delete=False, auto_rename=None,
-# help=False, version=False)
 
     validate_args(args)
 
