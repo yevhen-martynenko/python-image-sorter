@@ -10,6 +10,7 @@ from image_sorter.ext.loggers import Logger
 from image_sorter.ext import (
     get_files,
     format_directories,
+    validate_args,
 )
 from image_sorter.keybinding_actions import (
     move_file,
@@ -194,7 +195,7 @@ class ImageSorter:
             if is_copy:
                 copy_file(file_path, target_dir)
             else:
-                log_message, log_level = move_file(file_path, target_dir)
+                log_message, log_level = move_file(file_path, target_dir, self.args.auto_rename)
                 self.logger.log_message(log_message, log_level)
                 self.load_files()
 
@@ -243,10 +244,16 @@ class ImageSorter:
             self.stdscr.addstr(1, col2_x + 2, error_message, curses.color_pair(TEXT_COLOR))
 
     def display_directories(self) -> None:
+        """Displays formatted target directories with indexed previews"""
+        MAX_DISPLAY = 30
+        PREFIX_MAP = {10: "c+", 20: "a+"}
         formatted_dirs: list[str] = format_directories(self.target_directories, num_levels=2)
 
-        for i, dir in enumerate(formatted_dirs, start=1):
-            formatted_line: str = f"{i:>{len(str(i))}}  {dir}"
+        for i, dir in enumerate(formatted_dirs[:MAX_DISPLAY], start=1):
+            prefix = next((v for k, v in PREFIX_MAP.items() if i >= k), "")
+            preview: str = f"{prefix}{i % 10}" if prefix else str(i)
+
+            formatted_line: str = f"{preview:<3}  {dir}"
             self.stdscr.addstr(
                 i, self.cols["col3"][0] + 2,
                 formatted_line,
@@ -268,6 +275,8 @@ if __name__ == "__main__":
 # output_dirs=['images/forest/', 'images/sea/', 'images/mountains/'],
 # tree=None, safe_delete=True, confirm_delete=False, auto_rename=None,
 # help=False, version=False)
+
+    validate_args(args)
 
     if args.help:
         parser.print_help()
