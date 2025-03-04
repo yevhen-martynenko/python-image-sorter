@@ -26,11 +26,12 @@ class ImageSorter:
 
     def __init__(self, stdscr, args):
         self.stdscr = stdscr
-        self.logger = Logger()
-        self.ui = UI()
         self.args = args
+        self.logger = Logger()
+        self.ui = UI(self.args.theme)
         self.directory_path: str = args.input_dir
         self.target_directories: list[str] = args.output_dirs
+        self.files_avaliable = True
         self.load_files()
         self.scroll_pos = 0  # position of the first visible file
         self.selected_item_pos = 0 if self.num_files > 0 else -1
@@ -42,9 +43,17 @@ class ImageSorter:
             self.stdscr.erase()
             self.draw_borders()
 
-            self.display_file_list()  # TODO: parse situation with no images avaliable
-            self.display_image()
-            self.display_directories()
+            if self.files_avaliable:
+                self.display_file_list()
+                self.display_image()
+                self.display_directories()
+            else:
+                self.stdscr.addstr(
+                    1, self.cols['col1'][0] + 2,
+                    "No files available",
+                    self.ui.get_color("error")
+                )
+
             self.stdscr.refresh()
 
             curses.flushinp()
@@ -77,7 +86,8 @@ class ImageSorter:
         }
         self.bottom_y = self.height - 2 if self.height > 1 else self.height - 1
 
-    def draw_borders(self):  # TODO: add color to borders
+    def draw_borders(self):
+        # TODO: apply colors to borders from the color scheme
         for col_name, (x, width) in self.cols.items():
             rectangle(self.stdscr, 0, x, self.bottom_y, x + width - 1)
 
@@ -105,8 +115,12 @@ class ImageSorter:
                 level="error"
             )
             self.selected_item_pos = -1
+            self.files_avaliable = False
 
     def handle_keypress(self, key):
+        if not self.files_avaliable:
+            return True
+
         if self.selected_item_pos >= 0:
             file_path: Path = self.raw_files[self.selected_item_pos]
         else:
@@ -196,8 +210,12 @@ class ImageSorter:
             if file_index >= self.num_files:
                 break
 
+            file_index_length: int = len(str(self.num_files))
+            file_index_str: str = f"{file_index:>{file_index_length}}"
             max_line_length: int = max(len(f) for f in self.files)
-            formatted_line: str = f"{file_index:>{len(str(self.num_files))}}  {self.files[file_index]:<{max_line_length}}"
+            file_name: str = self.files[file_index]
+
+            formatted_line: str = f"{file_index_str}  {file_name:<{max_line_length}}"
             formatted_line = formatted_line.ljust(self.cols["col1"][0] - 4)
 
             if file_index == self.selected_item_pos:
@@ -223,12 +241,24 @@ class ImageSorter:
         # subprocess.run(["clear"])
         self.stdscr.refresh()
 
+        mirror = "none"
+        mirror_horizontal = self.ui.elements.get("mirror", False)
+        mirror_vertical = self.ui.elements.get("mirror_vertical", False)
+
+        if mirror_horizontal and mirror_vertical:
+            mirror = "both"
+        elif mirror_horizontal:
+            mirror = "horizontal"
+        elif mirror_vertical:
+            mirror = "vertical"
+
         try:
             subprocess.run([
                 "kitty", "icat",
                 "--align", "left",
                 "--place", f"{img_width}x{img_height}@{img_pos_left}x{img_pos_top}",
                 "--no-trailing-newline", "--silent",
+                "--mirror", mirror,
                 "--clear",
                 str(file_path)
             ], stderr=subprocess.DEVNULL, check=True)
@@ -240,18 +270,22 @@ class ImageSorter:
         """Displays formatted target directories with indexed previews"""
         MAX_DISPLAY = 30
         PREFIX_MAP = {10: "c+", 20: "a+"}  # TODO: add keypress events for this, c+ CTRL+KEY, a+ ALT+KEY
+
         formatted_dirs: list[str] = format_directories(
             self.target_directories,
             num_levels=2
         )
+        max_display_limit: int = min(MAX_DISPLAY, len(formatted_dirs))
+        max_index_length: int = len(str(max_display_limit))
 
-        max_index_length: int = len(str(min(MAX_DISPLAY, len(formatted_dirs)))) + (1 if len(formatted_dirs) >= 10 else 0)
+        if len(formatted_dirs) >= 10:
+            max_index_length += 1
 
         for i, dir in enumerate(formatted_dirs[:MAX_DISPLAY], start=1):
             prefix: str = next((v for k, v in PREFIX_MAP.items() if i >= k), "")
             preview: str = f"{prefix}{i % 10}" if prefix else str(i)
-
             formatted_line: str = f"{preview:<{max_index_length}}  {dir}"
+
             self.stdscr.addstr(
                 i, self.cols["col3"][0] + 2,
                 formatted_line,
