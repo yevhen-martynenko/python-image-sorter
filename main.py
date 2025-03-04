@@ -15,7 +15,6 @@ from image_sorter.ext import (
 )
 from image_sorter.keybinding_actions import (
     move_file,
-    copy_file,
     delete_file,
     rename_file,
     open_with_system_app,
@@ -28,7 +27,7 @@ class ImageSorter:
     def __init__(self, stdscr, args):
         self.stdscr = stdscr
         self.logger = Logger()
-        self.ui = UI()  # TODO: get theme name with argparse
+        self.ui = UI()
         self.args = args
         self.directory_path: str = args.input_dir
         self.target_directories: list[str] = args.output_dirs
@@ -150,8 +149,7 @@ class ImageSorter:
         elif key in (curses.KEY_DC, ord("d")):
             log_message, log_level = delete_file(
                 file_path,
-                self.args.safe_delete,
-                self.args.confirm_delete
+                self.args.safe_delete
             )
             self.logger.log_message(log_message, log_level)
             self.load_files()
@@ -174,19 +172,22 @@ class ImageSorter:
 
         return False
 
-    def process_keypress(self, key: int, file_path: Path, is_copy: bool = False) -> None:  # TODO: get is_copy with argparse
+    def process_keypress(self, key: int, file_path: Path) -> None:
         """Handles keypress events for moving or copying files to target directories"""
         target_index: int = key - ord('0')
 
         if 1 <= target_index <= len(self.target_directories):
             target_dir = self.target_directories[target_index - 1]
 
-            if is_copy:
-                copy_file(file_path, target_dir)
-            else:
-                log_message, log_level = move_file(file_path, target_dir, self.args.auto_rename)
-                self.logger.log_message(log_message, log_level)
-                self.load_files()
+            log_message, log_level = move_file(
+                file_path,
+                target_dir,
+                self.args.auto_rename,
+                self.args.copy_mode
+            )
+
+            self.logger.log_message(log_message, log_level)
+            self.load_files()
 
     def display_file_list(self) -> None:
         """Display a list of files in the first column with scrolling functionality"""
@@ -238,7 +239,7 @@ class ImageSorter:
     def display_directories(self) -> None:
         """Displays formatted target directories with indexed previews"""
         MAX_DISPLAY = 30
-        PREFIX_MAP = {10: "c+", 20: "a+"}
+        PREFIX_MAP = {10: "c+", 20: "a+"}  # TODO: add keypress events for this, c+ CTRL+KEY, a+ ALT+KEY
         formatted_dirs: list[str] = format_directories(
             self.target_directories,
             num_levels=2
