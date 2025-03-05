@@ -161,6 +161,7 @@ class ImageSorter:
                 self.scroll_pos = 0
 
         elif key in (curses.KEY_DC, ord("d")):
+            self.logger.log_message("Delet is not working", "error")
             log_message, log_level = delete_file(
                 file_path,
                 self.args.safe_delete
@@ -179,7 +180,7 @@ class ImageSorter:
             self.scroll_pos = max(0, self.num_files - self.max_visible)
 
         elif key in (curses.KEY_F1, ord("h")):
-            ...  # TODO: open help menu
+            self.open_help_menu()
 
         elif key in (curses.KEY_ENTER, 10, 13):
             open_with_system_app(file_path)
@@ -244,6 +245,14 @@ class ImageSorter:
             else:
                 attr = self.ui.get_color("text")
             self.stdscr.addstr(1 + i, self.cols['col1'][0] + 2, formatted_line, attr)
+
+        file_label: str = "No files" if self.num_files == 0 else f"Total files: {self.num_files}"
+        self.stdscr.addstr(
+            self.height - 1,
+            self.cols['col1'][0] + 2,
+            file_label,
+            self.ui.get_color("text_highlight")
+        )
 
     def display_image(self) -> None:
         """Displays an image using Kitty's icat with a dynamically sized picture"""
@@ -313,7 +322,50 @@ class ImageSorter:
                 self.ui.get_color("text")
             )
 
+    def open_help_menu(self) -> None:
+        help_win = curses.newwin(self.height, self.width, 3, 0)
+        help_win.box()
+
+        title_win = curses.newwin(3, self.width, 0, 0)
+        title: str = "Help"
+
+        for i in range(3):
+            title_win.addstr(i, 1, " " * (self.width - 2), self.ui.get_color("text", "reverse"))
+        title_win.addstr(1, self.width // 2 - len(title) // 2, title, self.ui.get_color("text", "reverse"))
+
+        # Display key bindings
+        help_win.addstr(1, 2, "Keys - Movement:")
+        help_win.addstr(2, 4, "[↓/j]  - Move down")
+        help_win.addstr(3, 4, "[↑/k]  - Move up")
+
+        help_win.addstr(5, 2, "Keys - Actions:")
+        help_win.addstr(6, 4,  "[DEL/d]  - Delete image")
+        help_win.addstr(7, 4, "[F2/r]   - Rename image")
+        help_win.addstr(8, 4, "[ENTER]  - Open image")
+        help_win.addstr(9, 4, "[q]      - Exit")
+        help_win.addstr(10, 4, "[F1/h]   - Open help menu")
+
+        help_win.addstr(12, 2, "Keys - Move File:")
+        help_win.addstr(13, 4, "[1-9, 0]        - Move to directories 1-10")
+        help_win.addstr(14, 4, "[ALT + 1-9, 0]  - Move to directories 11-20")
+        help_win.addstr(15, 4, "[` + 1-9, 0]    - Move to directories 21-30")
+
+        title_win.refresh()
+        help_win.refresh()
+
+        while True:
+            key = help_win.getch()
+            if key in (27, curses.KEY_F1, ord('h'), ord('q')):
+                help_win.clear()
+                title_win.clear()
+                help_win.refresh()
+                title_win.refresh()
+                del help_win
+                del title_win
+                break
+
     def get_new_name(self, file_path: Path) -> str:
+        """Prompts the user to enter a new file name"""
         name: str = file_path.name
         suffix: str = file_path.suffix
         name_without_suffix: str = name.removesuffix(suffix)
@@ -331,8 +383,10 @@ class ImageSorter:
         )
 
         key = prompt_win.getch()
-        if key == 27:
+        if key in (27, curses.KEY_F2):
             prompt_win.clear()
+            prompt_win.refresh()
+            del prompt_win
             return name
 
         prompt_win.clear()
