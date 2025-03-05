@@ -169,8 +169,14 @@ class ImageSorter:
             self.load_files()
 
         elif key in (curses.KEY_F2, ord("r")):
-            # rename_file(file_path, new_name)  # TODO: rename file, make a prompt for new_name. use curses Textbox
-            ...
+            new_name = self.get_new_name(file_path)
+
+            log_message, log_level = rename_file(file_path, new_name)
+            self.logger.log_message(log_message, log_level)
+            self.load_files()
+
+            self.selected_item_pos = self.num_files - 1
+            self.scroll_pos = max(0, self.num_files - self.max_visible)
 
         elif key in (curses.KEY_F1, ord("h")):
             ...  # TODO: open help menu
@@ -178,7 +184,7 @@ class ImageSorter:
         elif key in (curses.KEY_ENTER, 10, 13):
             open_with_system_app(file_path)
 
-        elif key in (ord("q"), 27):  # 27 - ESC
+        elif key == ord("q"):
             return True
 
         elif file_path:
@@ -188,7 +194,22 @@ class ImageSorter:
 
     def process_keypress(self, key: int, file_path: Path) -> None:
         """Handles keypress events for moving or copying files to target directories"""
-        target_index: int = key - ord('0')
+        target_index: int = -1
+        prefix_increment: int = 0
+
+        if key == 27:  # ESC, ALT key
+            next_key = self.stdscr.getch()
+            prefix_increment = 10
+        elif key == ord('`'):
+            next_key = self.stdscr.getch()
+            prefix_increment = 20
+        else:
+            next_key = key
+
+        if next_key in range(ord('1'), ord('9') + 1):
+            target_index = next_key - ord('0') + prefix_increment
+        elif next_key == ord('0'):
+            target_index = prefix_increment + 10
 
         if 1 <= target_index <= len(self.target_directories):
             target_dir = self.target_directories[target_index - 1]
@@ -269,7 +290,7 @@ class ImageSorter:
     def display_directories(self) -> None:
         """Displays formatted target directories with indexed previews"""
         MAX_DISPLAY = 30
-        PREFIX_MAP = {10: "c+", 20: "a+"}  # TODO: add keypress events for this, c+ CTRL+KEY, a+ ALT+KEY
+        PREFIX_MAP = {21: "`+", 11: "a+"}
 
         formatted_dirs: list[str] = format_directories(
             self.target_directories,
@@ -283,7 +304,7 @@ class ImageSorter:
 
         for i, dir in enumerate(formatted_dirs[:MAX_DISPLAY], start=1):
             prefix: str = next((v for k, v in PREFIX_MAP.items() if i >= k), "")
-            preview: str = f"{prefix}{i % 10}" if prefix else str(i)
+            preview: str = f"{prefix}{i % 10}" if prefix else str(i % 10)
             formatted_line: str = f"{preview:<{max_index_length}}  {dir}"
 
             self.stdscr.addstr(
@@ -291,6 +312,40 @@ class ImageSorter:
                 formatted_line,
                 self.ui.get_color("text")
             )
+
+    def get_new_name(self, file_path: Path) -> str:
+        name: str = file_path.name
+        suffix: str = file_path.suffix
+        name_without_suffix: str = name.removesuffix(suffix)
+
+        prompt_win = curses.newwin(
+            1,
+            self.cols["col1"][1] - 2,
+            self.selected_item_pos + 2,
+            self.cols["col1"][0] + 1
+        )
+        prompt_win.clear()
+        prompt_win.addstr(
+            name_without_suffix[:self.cols["col1"][1] - 3],
+            self.ui.get_color("text", "reverse")
+        )
+
+        key = prompt_win.getch()
+        if key == 27:
+            prompt_win.clear()
+            return name
+
+        prompt_win.clear()
+        prompt_win.addstr(chr(key))
+
+        textbox = curses.textpad.Textbox(prompt_win, insert_mode=True)
+        textbox.edit()
+
+        new_name = textbox.gather().strip()
+        if not new_name:
+            new_name = name_without_suffix
+
+        return f"{new_name}{suffix}"
 
 
 def main(stdscr, args):
