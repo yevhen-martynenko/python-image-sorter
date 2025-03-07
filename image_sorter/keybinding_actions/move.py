@@ -21,13 +21,13 @@ def move_file(
     try:
         if copy_mode:
             shutil.copy2(file_path, new_name)
-            return (f"File \"{file_name}\" successfully copied to {new_name}", "success")
+            return (f'File "{file_name}" successfully copied to {new_name}', "success")
         else:
-            file_path.rename(new_name)
-            return (f"File \"{file_name}\" successfully moved to {new_name}", "success")
+            shutil.move(str(file_path), str(new_name))
+            return (f'File "{file_name}" successfully moved to {new_name}', "success")
     except Exception as e:
         action: str = "Copying" if copy_mode else "Moving"
-        return (f"{action} file \"{file_name}\" to {target_dir}: {e}", "error")
+        return (f'{action} file "{file_name}" to {target_dir}: {e}', "error")
 
 
 def create_target_dir(target_dir: str) -> Path:
@@ -37,7 +37,7 @@ def create_target_dir(target_dir: str) -> Path:
     try:
         target_dir_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        return (f"Creating target directory \"{target_dir}\": {e}", "error")
+        return (f'Creating target directory "{target_dir}": {e}', "error")
 
     return target_dir_path
 
