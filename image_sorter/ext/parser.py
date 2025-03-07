@@ -1,5 +1,7 @@
 import argparse
 
+# TODO: implement dynamic argument completion with `argcomplete` for tab completion support
+
 
 def configure_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -12,24 +14,28 @@ def configure_parser() -> argparse.ArgumentParser:
     cmd_group = parser.add_argument_group("Commands")
     cmd = cmd_group
     cmd.add_argument(
-        "--input-dir",
+        "-i", "--input-dir",
         type=str,
-        required=True,
         metavar="DIR",
         help="directory to take pictures from"
     )
     cmd.add_argument(
-        "--output-dirs",
-        required=True,
+        "-o", "--output-dirs",
         nargs="*",
         metavar="DIR",
-        help="directory to move pictures to"
+        help="directories to move pictures to"
     )
     cmd.add_argument(
-        "--tree",
+        "-t", "--tree",
         action="store_true",
         default=False,
-        help="first level tree"  # TODO: add help
+        help="list all files in the first level of the target directory tree"
+    )
+    cmd.add_argument(
+        "-c", "--copy_mode",
+        action="store_true",
+        default=False,
+        help="enable copy mode instead of moving files"
     )
     cmd.add_argument(
         "--safe-delete",
@@ -38,18 +44,18 @@ def configure_parser() -> argparse.ArgumentParser:
         help="move files to '~/.trash/image_sorter/' instead of deleting them permanently"
     )
     cmd.add_argument(
-        "--confirm-delete",
-        action="store_true",
-        default=False,
-        help="require confirmation before deletion"
-    )
-    cmd.add_argument(
-        "--auto-rename",
+        "-r", "--auto-rename",
         type=int,
         nargs="?",
         metavar="BASE",
-        # default="-1",
+        default="0",
         help="automatically rename files using the specified numeral base"
+    )
+    cmd.add_argument(
+        "--theme",
+        type=str,
+        default="default",
+        help="specify the color theme to use"
     )
 
     opt_group = parser.add_argument_group("Options")

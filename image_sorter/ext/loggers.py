@@ -3,8 +3,12 @@ from pathlib import Path
 
 
 class Logger:
-    def __init__(self, log_dir="logs"):
-        self.log_dir = Path(log_dir)
+    def __init__(self, log_dir=None):
+        if log_dir is None:
+            self.log_dir = Path.home() / ".local/share" / "image_sorter"
+        else:
+            self.log_dir = Path(log_dir).expanduser().resolve()
+
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self.main_log = self.log_dir / "main.log"
