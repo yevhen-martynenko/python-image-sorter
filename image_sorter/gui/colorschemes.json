@@ -1,0 +1,18 @@
+{
+    "default": {
+        "default_colors": {
+            "foreground": [15, -1],
+            "background": [1, -1]
+        },
+        "colors": {
+            "text": [15, -1],
+            "text_highlight": [15, -1],
+            "error": [9, -1]
+        },
+        "elements": {
+            "cursor": "reverse",
+            "mirror": false,
+            "mirror_vertical": false
+        }
+    }
+}
