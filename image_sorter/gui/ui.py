@@ -1,7 +1,7 @@
 import curses
 
-from .color import init_colors
-from .colorscheme import ColorScheme
+from image_sorter.gui.color import init_colors
+from image_sorter.gui.colorscheme import ColorScheme
 
 
 class UI:
@@ -17,8 +17,10 @@ class UI:
             "invisible": curses.A_INVIS,
             "dim": curses.A_DIM,
         }
+        self.colors = {}
+        self.elements = {}
 
-    def load_colors(self) -> dict[str, int]:
+    def load_colors(self) -> dict[str, tuple[int, int]]:
         self.colors = self.colorscheme.get_colors()
         self.elements = self.colorscheme.get_elements()
 
@@ -30,7 +32,7 @@ class UI:
         if isinstance(color, int):
             color_pair = curses.color_pair(color)
         elif isinstance(color, str):
-            color_index = self.colors.get(color.upper(), 1)
+            color_index = self.colors.get(color.lower(), 1)
             color_pair = curses.color_pair(color_index[0])
 
         style_flag = self.text_styles.get(style, curses.A_NORMAL)
