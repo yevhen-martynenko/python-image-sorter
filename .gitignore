@@ -1,0 +1,21 @@
+# Cache
+__pycache__/
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.env/
+env.bak/
+env.py
+
+# Logs and runtime files
+logs/
+logs/*.log
+logs/*.txt
+logs/*.db
+*.log
+*.sqlite
+*.sqlite3
+*.db
