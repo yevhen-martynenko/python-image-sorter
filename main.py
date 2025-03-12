@@ -1,7 +1,7 @@
 import curses
 import subprocess
 import shutil
-from curses.textpad import rectangle, Textbox
+from curses.textpad import rectangle
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 
@@ -49,7 +49,7 @@ class ImageSorter:
                 self.display_directories()
             else:
                 self.stdscr.addstr(
-                    1, self.cols['col1'][0] + 2,
+                    1, self.cols["col1"][0] + 2,
                     "No files available",
                     self.ui.get_color("error")
                 )
@@ -161,7 +161,7 @@ class ImageSorter:
                 self.scroll_pos = 0
 
         elif key in (curses.KEY_DC, ord("d")):
-            self.logger.log_message("Delet is not working", "error")
+            self.logger.log_message("Delete is not working", "error")
             log_message, log_level = delete_file(
                 file_path,
                 self.args.safe_delete
@@ -201,15 +201,15 @@ class ImageSorter:
         if key == 27:  # ESC, ALT key
             next_key = self.stdscr.getch()
             prefix_increment = 10
-        elif key == ord('`'):
+        elif key == ord("`"):
             next_key = self.stdscr.getch()
             prefix_increment = 20
         else:
             next_key = key
 
-        if next_key in range(ord('1'), ord('9') + 1):
-            target_index = next_key - ord('0') + prefix_increment
-        elif next_key == ord('0'):
+        if next_key in range(ord("1"), ord("9") + 1):
+            target_index = next_key - ord("0") + prefix_increment
+        elif next_key == ord("0"):
             target_index = prefix_increment + 10
 
         if 1 <= target_index <= len(self.target_directories):
@@ -244,12 +244,12 @@ class ImageSorter:
                 attr = self.ui.get_color("text_highlight", self.ui.elements.get("cursor", "normal"))
             else:
                 attr = self.ui.get_color("text")
-            self.stdscr.addstr(1 + i, self.cols['col1'][0] + 2, formatted_line, attr)
+            self.stdscr.addstr(1 + i, self.cols["col1"][0] + 2, formatted_line, attr)
 
         file_label: str = "No files" if self.num_files == 0 else f"Total files: {self.num_files}"
         self.stdscr.addstr(
             self.height - 1,
-            self.cols['col1'][0] + 2,
+            self.cols["col1"][0] + 2,
             file_label,
             self.ui.get_color("text_highlight")
         )
